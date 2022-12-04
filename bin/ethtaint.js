@@ -41,7 +41,7 @@ function update () {
   let s = 'Tainted ' + tainted
   s += ' / Traced ' + traced
   s += ' / Txs ' + txs
-  logUpdate(s)
+  //logUpdate(s)
 }
 function log () {
   logUpdate.clear()
@@ -62,7 +62,7 @@ async function traceAddresses (sourceHex, startBlock) {
   try {
     tracker.on('taint', address => {
       tainted++
-      log(address.hex)
+      //log(address.hex)
     })
     tracker.on('tracedAddress', address => {
       traced++

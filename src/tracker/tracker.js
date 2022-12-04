@@ -188,7 +188,7 @@ async function deleteFileLine (filePath, deleteLine) {
   for (let i = 0, line; i < fileLines.length; i++) {
     line = fileLines[i]
     if (line !== deleteLine) {
-      newLines.append(line)
+      newLines.push(line)
     }
   }
   const newData = newLines.join('\n')
@@ -282,16 +282,20 @@ async function deleteTainted (sourceHex, startBlock, addressHex, fromBlock) {
 }
 
 /**
- * Process a transaction.
+ * Visit a transaction, populate global tainted Set, make reference in each object(taint <-> txn)
+ * the tx is a transaction listed from current address(not source).
+ * populate taint fields, make mutual refs(taint <-> txn)
+ * added tx.to addr to the global tainted set.
+ * 
  */
 async function processTransaction (
   tracker,
   taint,
   source,
   sourceStartBlock,
-  address,
+  address,  /* this txn involved this address, either in to, or from*/
   tx,
-  tainted,
+  tainted,  /* global tainted set to be populated from tx.to */
   taintedFrom,
   traced
 ) {
@@ -300,7 +304,7 @@ async function processTransaction (
     return
   }
 
-  // Input
+  // txn Input is current address, we only care outgoing txn, i.e, address reachable from current addr.
   if (tx.to === address) {
     return
   }
@@ -338,7 +342,7 @@ async function processTransaction (
   // Record tainted
   taint.addRecipient(tx.to)
   tx.to.addTaint(taint)
-  taintedFrom.set(tx.ot, tx.block.number)
+  taintedFrom.set(tx.to, tx.block.number)
   await recordTainted(source.hex, sourceStartBlock, tx.to.hex, tx.block.number)
 
   // Emit tainted
@@ -497,6 +501,7 @@ class Tracker extends EventEmitter {
           fromBlockString = fields[1]
           fromBlock = Number.parseInt(fromBlockString)
           taintedFrom.set(address, fromBlock)
+          console.log("add tainted ", address.hex);
           this.emit('taint', address, taint)
         }
         const tracedFilePath = dirPath + '/traced'
@@ -538,6 +543,7 @@ class Tracker extends EventEmitter {
           priv.canceling = false
           return
         }
+        console.log("starting trace: source -> addr ", source.hex, address.hex);
 
         // Get address transactions
         let txs, numTxs, tx
@@ -607,7 +613,8 @@ class Tracker extends EventEmitter {
           address
         )
 
-        // Record traced
+        // Record traced address from source, startblock
+        console.log("record traced : src -> addr", sourceHex, address.hex, " block: ", startBlock);
         await recordTraced(sourceHex, startBlock, address.hex)
       }
 

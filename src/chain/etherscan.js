@@ -85,7 +85,6 @@ async function mapTransaction (clientTx, cache) {
       to,
       amount
     )
-
     // Cache transaction
     await cache.tx.set(hash, tx)
   }
