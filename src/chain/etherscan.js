@@ -38,9 +38,11 @@ const privs = new WeakMap()
  *     Equivalent ethtaint transaction.
  */
 async function mapTransaction (clientTx, cache) {
-  // Map block
   const blockNumberString = clientTx.blockNumber
   const blockNumber = parseInt(blockNumberString, 10)
+  if (!Number.isInteger(blockNumber)) {
+    return null;
+  }
   let block = await cache.block.get(blockNumber)
   if (block === undef) {
     block = new Block(blockNumber)
@@ -60,6 +62,8 @@ async function mapTransaction (clientTx, cache) {
   let to
   if (toHex === '') {
     to = null
+    console.log("txn no to addr; quite !", clientTx.hash.toLowerCase());
+    return null;
   } else {
     to = await cache.address.get(toHex)
     if (to === undef) {
@@ -131,12 +135,15 @@ class ChainAgent {
     // Map to Transaction objects
     const txs = []
     const cache = priv.cache
-    for (var i = 0; i < rawTxs.length; i++) {
-      var rawTx = rawTxs[i]
-      var tx = await mapTransaction(rawTx, cache)
-      txs.push(tx)
+    if (rawTxs != null) {
+      for (var i = 0; i < rawTxs.length; i++) {
+        var rawTx = rawTxs[i]
+        var tx = await mapTransaction(rawTx, cache);
+        if (tx != null) {
+          txs.push(tx)
+        }
+      }
     }
-
     // Return result
     return txs
   }

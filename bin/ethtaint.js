@@ -76,6 +76,7 @@ async function traceAddresses (sourceHex, startBlock) {
     logUpdate.done()
   } catch (e) {
     log(e.toString())
+    console.error(e);
   }
 }
 traceAddresses(sourceHex, startBlock)

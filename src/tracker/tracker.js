@@ -286,7 +286,6 @@ async function deleteTainted (sourceHex, startBlock, addressHex, fromBlock) {
  * the tx is a transaction listed from current address(not source).
  * populate taint fields, make mutual refs(taint <-> txn)
  * added tx.to addr to the global tainted set.
- * 
  */
 async function processTransaction (
   tracker,
@@ -501,7 +500,6 @@ class Tracker extends EventEmitter {
           fromBlockString = fields[1]
           fromBlock = Number.parseInt(fromBlockString)
           taintedFrom.set(address, fromBlock)
-          console.log("add tainted ", address.hex);
           this.emit('taint', address, taint)
         }
         const tracedFilePath = dirPath + '/traced'
@@ -528,7 +526,8 @@ class Tracker extends EventEmitter {
         await initializeSave(sourceHex, startBlock)
       }
 
-      // Trace
+      // take a tainted address that is not in traced.
+      // tainted added when processing txn from the current addr.
       for (
         let address = getTaintedUntraced(tainted, traced),
           fromBlockNumber;
@@ -543,7 +542,6 @@ class Tracker extends EventEmitter {
           priv.canceling = false
           return
         }
-        console.log("starting trace: source -> addr ", source.hex, address.hex);
 
         // Get address transactions
         let txs, numTxs, tx
@@ -572,7 +570,11 @@ class Tracker extends EventEmitter {
               page,
               pageSize
             })
-          numTxs = txs.length
+          if (txs === undefined) {
+            numTxs = 0;
+          } else {
+            numTxs = txs.length;
+          }
 
           // Process transactions
           for (var i = 0; i < numTxs; i++) {
@@ -595,17 +597,18 @@ class Tracker extends EventEmitter {
               tainted,
               taintedFrom,
               traced
-            )
+            );
             this.emit(
               'processedTransaction',
               address,
               tx
-            )
+            );
+            console.log("visit one txn: addr ", address.hex, " txn: ", tx.from.hex, " -> ", tx.to.hex);
           }
 
           // Increment page number
           page++
-        } while (numTxs === pageSize)
+        } while (numTxs === pageSize && page == 1);
 
         // Emit traced
         this.emit(
