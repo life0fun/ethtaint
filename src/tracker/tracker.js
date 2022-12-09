@@ -487,8 +487,8 @@ class Tracker extends EventEmitter {
 
       // a set of tainted addr populated from the txns of the current traced addr.
       // list all txns of the current traced addr, for the to/from addrs of each txn, add to tainted set. 
-      const tainted = new Set()
-      tainted.add(source)
+      const tainted = new Set();
+      tainted.add(source);
       const taintedSinceBlock = new Map()
       taintedSinceBlock.set(source, startBlock)
       const traced = new Set()
