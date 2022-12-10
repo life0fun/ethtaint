@@ -12,7 +12,7 @@
 const privs = new WeakMap()
 
 /**
- * A taint item.
+ * A taint item. Repr a src, a set of transactions, a set of recipients/target addrs. 
  * @static
  */
 class Taint {

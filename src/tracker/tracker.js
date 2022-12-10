@@ -255,6 +255,75 @@ async function appendAddrToTraced (sourceHex, startBlock, addressHex) {
 }
 
 /**
+ * @param {string} srcHex - Hex representation of source address.
+ * @param {number} startBlock - Start block of tainting.
+ * @param {cache} cache - global cache
+ * @return {taint} taint - populate the global taint object of the srcAddr
+ * @return {taintedAddrSet} - populate all the tainted addr to the set
+ * @return {tracedAddrSet} - populate all the traced addr to the set
+ * @return {taintedSinceBlockMap} - populate the addr, startblock mapping
+ */
+async function loadTaintedAndTraced(tracker, srcHex, startBlock, cache, 
+  taint, taintedAddrSet,tracedAddrSet, taintedSinceBlockMap) {
+  const dirPath = 'trace/' + srcHex + '-' + startBlock
+  const taintedFilePath = dirPath + '/tainted'
+  const taintedFileData = await readFile(taintedFilePath)
+  const taintedFileLines = taintedFileData.split('\n')
+  // Read in each addr in the trace/srcHex/tainted, populate taint and block map
+  for (
+    let i = 1, line, fields,
+      addressHex, address,
+      fromBlockString, fromBlock;
+    i < taintedFileLines.length;
+    i++
+  ) {
+    line = taintedFileLines[i]
+    if (!line) continue
+    fields = line.split('|')
+    addressHex = fields[0]
+    address = await cache.address.get(addressHex)
+    if (address === undef) {
+      try {
+        address = new Address(addressHex)
+      } catch (e) {
+        continue;
+      }
+      await cache.address.set(addressHex, address)
+    }
+    address.addTaint(taint)
+    taint.addRecipient(address)
+
+    taintedAddrSet.add(address)
+    fromBlockString = fields[1]
+    fromBlock = Number.parseInt(fromBlockString)
+    taintedSinceBlockMap.set(address, fromBlock)
+    tracker.emit('taint', address, taint)
+  }
+  // populate traced addr set
+  const tracedFilePath = dirPath + '/traced'
+  const tracedFileData = await readFile(tracedFilePath)
+  const tracedFileLines = tracedFileData.split('\n')
+  for (
+    let i = 0, line,
+      addressHex, address;
+    i < tracedFileLines.length;
+    i++
+  ) {
+    line = tracedFileLines[i]
+    if (!line) continue
+    addressHex = line
+    address = await cache.address.get(addressHex)
+    if (address === undef) {
+      address = new Address(addressHex)
+      await cache.address.set(addressHex, address)
+    }
+
+    tracedAddrSet.add(address)
+    tracker.emit('tracedAddress', address)
+  }
+}
+
+/**
  * Delete address traced.
  * @param {string} sourceHex - Hex representation of source address.
  * @param {number} startBlock - Start block of tainting.
@@ -282,7 +351,8 @@ async function deleteAddrFromTainted (sourceHex, startBlock, addressHex, fromBlo
 }
 
 /**
- * Visit a transaction, populate global tainted Set, make reference in each object(taint <-> txn)
+ * Visit a transaction, populate the global tainted Set, fix refs in each object
+ * (taint <-> txn)
  * the tx is a transaction listed from current address(not source).
  * populate taint fields, make mutual refs(taint <-> txn)
  * added tx.to addr to the global tainted set.
@@ -474,75 +544,29 @@ class Tracker extends EventEmitter {
 
     // Watch for trace failure
     try {
-      // Get address
-      let source = await cache.address.get(sourceHex)
-      if (source === undef) {
-        source = new Address(sourceHex)
-        await cache.address.set(sourceHex, source)
+      // get Addr object from addrHex
+      let srcAddr = await cache.address.get(sourceHex)
+      if (srcAddr === undef) {
+        srcAddr = new Address(sourceHex)
+        await cache.address.set(sourceHex, srcAddr)
       }
 
-      // Create taint
-      const taint = new Taint(source)
-      source.addTaint(taint)
+      // One start srcAddr has one taint stores a set of txns and recipient addrs.
+      const taint = new Taint(srcAddr)
+      srcAddr.addTaint(taint)
 
       // a set of tainted addr populated from the txns of the current traced addr.
       // list all txns of the current traced addr, for the to/from addrs of each txn, add to tainted set. 
-      const tainted = new Set();
-      tainted.add(source);
-      const taintedSinceBlock = new Map()
-      taintedSinceBlock.set(source, startBlock)
-      const traced = new Set()
+      const taintedAddrSet = new Set();
+      taintedAddrSet.add(srcAddr);
+      const taintedSinceBlockMap = new Map()
+      taintedSinceBlockMap.set(srcAddr, startBlock)
+      const tracedAddrSet = new Set()
 
-      // Trace saving
+      // Each starting addr has trace/add/{tainted, traced} to store intermediate result. 
       if (await checkTraceDirExists(sourceHex, startBlock)) {
-        const dirPath = 'trace/' + sourceHex + '-' + startBlock
-        const taintedFilePath = dirPath + '/tainted'
-        const taintedFileData = await readFile(taintedFilePath)
-        const taintedFileLines = taintedFileData.split('\n')
-        for (
-          let i = 1, line, fields,
-            addressHex, address,
-            fromBlockString, fromBlock;
-          i < taintedFileLines.length;
-          i++
-        ) {
-          line = taintedFileLines[i]
-          if (!line) continue
-          fields = line.split('|')
-          addressHex = fields[0]
-          address = await cache.address.get(addressHex)
-          if (address === undef) {
-            address = new Address(addressHex)
-            await cache.address.set(addressHex, address)
-          }
-          address.addTaint(taint)
-          taint.addRecipient(address)
-          tainted.add(address)
-          fromBlockString = fields[1]
-          fromBlock = Number.parseInt(fromBlockString)
-          taintedSinceBlock.set(address, fromBlock)
-          this.emit('taint', address, taint)
-        }
-        const tracedFilePath = dirPath + '/traced'
-        const tracedFileData = await readFile(tracedFilePath)
-        const tracedFileLines = tracedFileData.split('\n')
-        for (
-          let i = 0, line,
-            addressHex, address;
-          i < tracedFileLines.length;
-          i++
-        ) {
-          line = tracedFileLines[i]
-          if (!line) continue
-          addressHex = line
-          address = await cache.address.get(addressHex)
-          if (address === undef) {
-            address = new Address(addressHex)
-            await cache.address.set(addressHex, address)
-          }
-          traced.add(address)
-          this.emit('tracedAddress', address)
-        }
+        loadTaintedAndTraced(this, sourceHex, startBlock, cache, 
+          taint, taintedAddrSet, tracedAddrSet, taintedSinceBlockMap);
       } else {
         await initializeTraceDir(sourceHex, startBlock)
       }
@@ -550,20 +574,12 @@ class Tracker extends EventEmitter {
       // take a tainted address that is not in traced.
       // tainted added when processing txn from the current addr.
       for (
-        let address = getTaintedUntraced(tainted, traced),
+        let addr = getTaintedUntraced(taintedAddrSet, tracedAddrSet),
           fromBlockNumber;
-        address !== null;
-        traced.add(address),
-        address = getTaintedUntraced(tainted, traced)
+        addr !== null;
+        tracedAddrSet.add(addr),
+        addr = getTaintedUntraced(taintedAddrSet, tracedAddrSet)
       ) {
-        // Detect canceling
-        if (priv.canceling) {
-          priv.tracing = false
-          priv.canceling()
-          priv.canceling = false
-          return
-        }
-
         // Get address transactions
         let txs, numTxs, tx
         let page = 1
@@ -577,16 +593,16 @@ class Tracker extends EventEmitter {
           }
 
           // Get tainted from block number
-          fromBlockNumber = taintedSinceBlock.get(address)
+          fromBlockNumber = taintedSinceBlockMap.get(addr)
 
           // Get next page of transactions
           this.emit(
             'page',
-            address,
+            addr,
             page
           )
           txs = await chain
-            .listAccountTransactions(address.hex, {
+            .listAccountTransactions(addr.hex, {
               startBlock: fromBlockNumber,
               page,
               pageSize
@@ -611,35 +627,33 @@ class Tracker extends EventEmitter {
             await processTransaction(
               this,
               taint,
-              source,
+              srcAddr,
               startBlock,
-              address,
+              addr,
               tx,
-              tainted,
-              taintedSinceBlock,
-              traced
+              taintedAddrSet,
+              taintedSinceBlockMap,
+              tracedAddrSet
             );
             this.emit(
               'processedTransaction',
-              address,
+              addr,
               tx
             );
-            console.log("visit one txn: addr ", address.hex, " txn: ", tx.from.hex, " -> ", tx.to.hex);
+            console.log("Visit txn of addr ", addr.hex, 
+            " txn: ", tx.from.hex, " -> ", tx.to.hex);
           }
 
           // Increment page number
           page++
         } while (numTxs === pageSize && page == 1);
 
-        // Emit traced
-        this.emit(
-          'tracedAddress',
-          address
-        )
+        // Emit one traced addr.
+        this.emit('tracedAddress', addr);
 
         // Record traced address from source, startblock
-        console.log("record traced : src -> addr", sourceHex, address.hex, " block: ", startBlock);
-        await appendAddrToTraced(sourceHex, startBlock, address.hex)
+        console.log("traced : ", sourceHex, addr.hex, " block: ", startBlock);
+        await appendAddrToTraced(sourceHex, startBlock, addr.hex)
       }
 
       // End tracing

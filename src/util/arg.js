@@ -68,7 +68,8 @@ exports.integer = function integer (arg) {
  */
 exports.addressHex = function addressHex (arg) {
   if (!ethereumAddress.isAddress(arg)) {
-    throw new Error('Argument must be an Ethereum address')
+    console.log("Error: Not a valid Eth Addr", arg);
+    throw new Error('Argument must be an Ethereum address', arg);
   }
 }
 
