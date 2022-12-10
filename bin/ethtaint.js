@@ -58,7 +58,7 @@ async function traceAddresses (sourceHex, startBlock) {
   }
   log(msg)
   update()
-  const tracker = new ethtaint.Tracker()
+  const tracker = new ethtaint.Tracker();
   try {
     tracker.on('taint', address => {
       tainted++
@@ -72,6 +72,7 @@ async function traceAddresses (sourceHex, startBlock) {
       txs++
       update()
     })
+    await tracker.db.initializeDB();
     await tracker.traceAddresses(sourceHex, startBlock)
     logUpdate.done()
   } catch (e) {

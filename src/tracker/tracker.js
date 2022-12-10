@@ -13,6 +13,7 @@ const Cache = require('../cache/cache')
 const ChainAgent = require('../chain/etherscan')
 const Address = require('../primitives/address')
 const Taint = require('../primitives/taint')
+const DB = require('../db/db');
 
 // Resources
 var undef
@@ -486,7 +487,8 @@ class Tracker extends EventEmitter {
    * No parameters.
    */
   constructor () {
-    super()
+    super();
+    this.db = new DB();
     const priv = {}
     privs.set(this, priv)
     priv.cache = {
@@ -640,8 +642,8 @@ class Tracker extends EventEmitter {
               addr,
               tx
             );
-            console.log("Visit txn of addr ", addr.hex, 
-            " txn: ", tx.from.hex, " -> ", tx.to.hex);
+            // console.log("Visit txn of addr ", addr.hex, 
+            // " txn: ", tx.from.hex, " -> ", tx.to.hex);
           }
 
           // Increment page number
