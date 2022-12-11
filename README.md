@@ -4,8 +4,6 @@ Taint tracking for Ethereum.
 
 Simple web interface:
 
-![](https://raw.githubusercontent.com/wiki/jestcrows/ethtaint/image/WebInterface3.png)
-
 Command line interface:
 
 ```bash
@@ -37,6 +35,8 @@ Provide your [Etherscan API key](https://etherscan.io/apis) in a new local confi
 
 Start a trace. Specify a source address and taint starting block. Start block defaults to 0:  
 `node bin/ethtaint.js 0xF5C62a46838D1e2Aa104Ef4a7e1A05f72bd58DE3 15900000`
+
+`node bin/ethtain.j 0xd65e0cbd31977b2e0e23c8330c8b5f020818fc91 15900000`
 
 Status and results will output to the command line. A list of identified tainted addresses will be written to `trace/SOURCEADDRESS-STARTBLOCK`. Tracing will continue until all existing chain data has been exhausted. A full trace can take a long time.
 
