@@ -637,6 +637,7 @@ class Tracker extends EventEmitter {
               taintedSinceBlockMap,
               tracedAddrSet
             );
+            await this.db.storeTransaction(tx);
             this.emit(
               'processedTransaction',
               addr,

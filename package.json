@@ -24,7 +24,8 @@
     "request": "^2.81.0",
     "request-promise-native": "^1.0.4",
     "socket.io": "^2.0.3",
-    "sqlite3": "^5.1.2"
+    "sqlite3": "^5.1.2",
+    "sqlite": "^4.1.2"
   },
   "devDependencies": {
     "ava": "^0.21.0",

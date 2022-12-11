@@ -9,8 +9,10 @@
 const fs = require('fs')
 const mkdirp = require('mkdirp')
 const EventEmitter = require('events')
-
+// import sqlite3 from 'sqlite3'
+// import { open } from 'sqlite'
 const sqlite3 = require('sqlite3').verbose();
+const sqlite = require('sqlite');
 const db_dir = "db/";
 const db_name = "taint.db";
 const db_path = db_dir + db_name;
@@ -25,16 +27,6 @@ var undef
  */
 const privs = new WeakMap()
 
-
-// async function prepare() {
-//   await db.query(sql`
-//     CREATE TABLE IF NOT EXISTS app_data (
-//       id VARCHAR NOT NULL PRIMARY KEY,
-//       value VARCHAR NOT NULL
-//     );
-//   `);
-// }
-// const prepared = prepare();
 
 // async function set(id, value) {
 //   await prepared;
@@ -90,16 +82,22 @@ async function loadSchema () {
   });
 }
 
-async function openDB (db, dbPath) {
+async function openDB (dbPath) {
   var schema_sql = await loadSchema();
-  return new Promise((resolve, reject) => {
-    // var db = new sqlite3.Database(dbPath);
-    db.serialize(() => {
-      db.exec(schema_sql);
-      console.log("Database Created ", dbPath);
-    });
-    resolve(db);
+  const db = await sqlite.open({
+    filename: dbPath,
+    driver: sqlite3.Database
   });
+  await db.exec(schema_sql);
+  return db;
+  // return new Promise((resolve, reject) => {
+  //   // var db = new sqlite3.Database(dbPath);
+  //   db.serialize(() => {
+  //     db.exec(schema_sql);
+  //     console.log("Database Created ", dbPath);
+  //   });
+  //   resolve(db);
+  // });
 }
 
 
@@ -126,7 +124,7 @@ class DB extends EventEmitter {
    */
   constructor () {
     super()
-    this.db = new sqlite3.Database(db_path);
+    //this.db = new sqlite3.Database(db_path);
     const priv = {}
     privs.set(this, priv)
     priv.canceling = false
@@ -134,11 +132,33 @@ class DB extends EventEmitter {
 
   async initializeDB () {
     await createDirectory(db_dir);
-    return openDB(this.db, db_path);
+    this.db = await openDB(db_path);
   }
 
   async storeTransaction (txn) {
-    storeTransactionToDb(txn);
+    const src_addr = {
+      "id": txn.from.hex,
+      "wei": txn.amount.wei,
+      "block": txn.block.number
+    };
+    const dst_addr = {
+      "id": txn.to.hex,
+      "wei": txn.amount.wei,
+      "block": txn.block.number
+    };
+    const transactions = {
+      "hash": txn.hash,
+      "src": txn.from.hex,
+      "dst": txn.to.hex,
+      "wei": txn.amount.wei,
+      "block": txn.block.number
+    };
+    await this.db.run("INSERT OR IGNORE INTO addresses VALUES(json(?))", 
+      JSON.stringify(src_addr));
+    await this.db.run("INSERT OR IGNORE INTO addresses VALUES(json(?))", 
+      JSON.stringify(dst_addr));
+    await this.db.run("INSERT INTO transactions VALUES(?, ?, json(?))", 
+      src_addr.id, dst_addr.id, JSON.stringify(transactions));
   }
 
   async traverse(addr) {
