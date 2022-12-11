@@ -8,15 +8,14 @@
 // Imports
 const fs = require('fs')
 const mkdirp = require('mkdirp')
-const EventEmitter = require('events')
-// import sqlite3 from 'sqlite3'
-// import { open } from 'sqlite'
+const EventEmitter = require('events');
 const sqlite3 = require('sqlite3').verbose();
 const sqlite = require('sqlite');
 const db_dir = "db/";
 const db_name = "taint.db";
 const db_path = db_dir + db_name;
 const schema_path = "src/db/schema.sql";
+const traverse_sql_path = "src/db/traverse.sql";
 
 // Resources
 var undef
@@ -27,55 +26,9 @@ var undef
  */
 const privs = new WeakMap()
 
-
-// async function set(id, value) {
-//   await prepared;
-//   await db.query(sql`
-//     INSERT INTO app_data (id, value)
-//       VALUES (${id}, ${value})
-//     ON CONFLICT (id) DO UPDATE
-//       SET value=excluded.value;
-//   `);
-// }
-
-// async function get(id) {
-//   await prepared;
-//   const results = await db.query(sql`
-//     SELECT value FROM app_data WHERE id=${id};
-//   `);
-//   if (results.length) {
-//     return results[0].value;
-//   } else {
-//     return undefined;
-//   }
-// }
-
-// async function remove(id) {
-//   await prepared;
-//   await db.query(sql`
-//     DELETE FROM app_data WHERE id=${id};
-//   `);
-// }
-
-// async function run() {
-//   const runCount = JSON.parse((await get('run_count')) || '0');
-//   console.log('run count =', runCount);
-//   await set('run_count', JSON.stringify(runCount + 1));
-//   console.log(await get('name'));
-//   await set('name', 'Forbes');
-//   console.log(await get('name'));
-//   await set('name', 'Forbes Lindesay');
-//   console.log(await get('name'));
-//   remove('name');
-// }
-// run().catch((ex) => {
-//   console.error(ex.stack);
-//   process.exit(1);
-// });
-
-async function loadSchema () {
+async function loadSql (sql_file) {
   return new Promise((resolve, reject) => {
-    fs.readFile(schema_path, 'utf8', (err, data) => {
+    fs.readFile(sql_file, 'utf8', (err, data) => {
       if (err) { reject(err); }
       else { resolve(data); }
     })
@@ -83,21 +36,13 @@ async function loadSchema () {
 }
 
 async function openDB (dbPath) {
-  var schema_sql = await loadSchema();
+  const schema_sql = await loadSql(schema_path);
   const db = await sqlite.open({
     filename: dbPath,
     driver: sqlite3.Database
   });
   await db.exec(schema_sql);
   return db;
-  // return new Promise((resolve, reject) => {
-  //   // var db = new sqlite3.Database(dbPath);
-  //   db.serialize(() => {
-  //     db.exec(schema_sql);
-  //     console.log("Database Created ", dbPath);
-  //   });
-  //   resolve(db);
-  // });
 }
 
 
@@ -157,12 +102,18 @@ class DB extends EventEmitter {
       JSON.stringify(src_addr));
     await this.db.run("INSERT OR IGNORE INTO addresses VALUES(json(?))", 
       JSON.stringify(dst_addr));
-    await this.db.run("INSERT INTO transactions VALUES(?, ?, json(?))", 
+    await this.db.run("INSERT OR IGNORE INTO transactions VALUES(?, ?, json(?))", 
       src_addr.id, dst_addr.id, JSON.stringify(transactions));
   }
 
   async traverse(addr) {
-
+    const traverse_sql = await loadSql(traverse_sql_path);
+    var records = await this.db.each(traverse_sql, [addr], 
+      (err, row) => {
+        if (err) { throw err; }
+        console.log("one row -> ", row);
+      });
+    console.log(" Done", records);
   }
 }
 
@@ -170,4 +121,5 @@ class DB extends EventEmitter {
 module.exports = DB
 
 // Circular imports
-const arg = require('../util/arg')
+const arg = require('../util/arg');const { throws } = require('assert');
+
