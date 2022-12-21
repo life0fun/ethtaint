@@ -73,7 +73,7 @@ async function traceAddresses (sourceHex, startBlock) {
       update()
     })
     await tracker.db.initializeDB();
-    await tracker.traceAddresses(sourceHex, startBlock);
+    await tracker.db.traverse(sourceHex);
     logUpdate.done()
   } catch (e) {
     log(e.toString())

@@ -40,6 +40,19 @@ Start a trace. Specify a source address and taint starting block. Start block de
 
 Status and results will output to the command line. A list of identified tainted addresses will be written to `trace/SOURCEADDRESS-STARTBLOCK`. Tracing will continue until all existing chain data has been exhausted. A full trace can take a long time.
 
+
+To traverse from an address,
+`node bin/traverse.js 0xd65e0cbd31977b2e0e23c8330c8b5f020818fc91`
+check db/trace.txt to see the details.
+
+The db/taint.db is a sqlite3 db that contains all traced transaction from 0xF5C62a46838D1e2Aa104Ef4a7e1A05f72bd58DE3 since block 15900000.
+
+`sqlite3 db/taint.db`, 
+`.tables`, s
+`select * from transactions`, 
+`select * from addresses`
+
+
 To use the web interface start the web server with `node web/server.js`. Open the interface in your browser at `http://localhost:7403/`.
 
 You can resume a past trace any time from either interface. Simply start a trace with the same source address and start block. Existing information will be read from the save of past traces. The new trace will continue where the past traces left off.
